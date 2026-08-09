@@ -1,0 +1,2 @@
+// Gradle이 이 프로젝트를 구분할 때 사용하는 이름이다.
+rootProject.name = 'secure-blog-api'

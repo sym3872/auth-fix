@@ -1,0 +1,17 @@
+{
+    "folders": [
+        {
+            "name": "SecureBlog API",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "code-runner.ignoreSelection": true,
+        "code-runner.runInTerminal": true,
+        "code-runner.executorMap": {
+            "java": "cd \"$workspaceRoot\" && ./run.sh"
+        },
+        "java.compile.nullAnalysis.mode": "automatic"
+    }
+}

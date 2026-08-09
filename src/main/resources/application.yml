@@ -1,0 +1,48 @@
+# 애플리케이션을 구분하기 위한 이름이다.
+spring:
+  main:
+    # 실행할 때 큰 Spring 로고 대신 숫자 메뉴부터 깔끔하게 보여 준다.
+    banner-mode: off
+
+  application:
+    name: secure-blog-api
+
+  # 설치 없이 실행되는 H2 in-memory 데이터베이스 연결 정보다.
+  datasource:
+    url: jdbc:h2:mem:blogdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # 개발 중 브라우저에서 H2 테이블과 데이터를 살펴볼 수 있게 콘솔을 켠다.
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      # 프로그램을 시작할 때 테이블을 만들고, 종료하면 없앤다.
+      # H2 in-memory DB는 학습용이므로 재시작할 때 데이터가 사라지는 것이 정상이다.
+      ddl-auto: create-drop
+    # 숫자 메뉴 사이에 긴 SQL이 출력되지 않도록 끈다.
+    show-sql: false
+    # 요청이 끝난 뒤 불필요하게 데이터베이스 연결을 유지하지 않는다.
+    open-in-view: false
+
+# 초보자가 접속 주소를 기억하기 쉽도록 기본 포트를 명시한다.
+server:
+  port: 8080
+
+# JWT를 만들 때 사용하는 학습용 비밀키와 토큰 유효 시간이다.
+jwt:
+  # Base64로 표현한 32바이트 키다. 실제 서비스에서는 이 값을 소스 코드에 두지 말고 환경 변수로 관리해야 한다.
+  secret: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+  # 60분 동안만 사용할 수 있는 Access Token이다. Refresh Token은 이 학습 프로젝트에서 사용하지 않는다.
+  expiration-ms: 3600000
+
+# 실행 화면에서는 메뉴에 집중할 수 있도록 일반 정보 로그를 숨긴다. 오류 로그는 계속 표시된다.
+logging:
+  level:
+    # 입력 실수로 발생하는 긴 Spring 경고는 숨기고 실제 서버 오류만 표시한다.
+    root: ERROR

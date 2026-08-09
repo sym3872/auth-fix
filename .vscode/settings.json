@@ -1,0 +1,8 @@
+{
+    "code-runner.executorMap": {
+        "java": "cd \"$workspaceRoot\" && ./run.sh"
+    },
+    "code-runner.ignoreSelection": true,
+    "code-runner.runInTerminal": true,
+    "java.configuration.updateBuildConfiguration": "automatic"
+}
