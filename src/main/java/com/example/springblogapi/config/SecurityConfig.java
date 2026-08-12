@@ -87,9 +87,16 @@ public class SecurityConfig {
                 exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
         );
 
-        // 회원가입·로그인과 게시글 조회는 공개하고, 나머지 요청은 로그인을 요구한다.
+        // 회원가입·로그인, Swagger 문서, 게시글 조회는 공개하고 나머지 요청은 로그인을 요구한다.
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/auth/**", "/h2-console/**", "/error").permitAll()
+                .requestMatchers(
+                        "/api/auth/**",
+                        "/h2-console/**",
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/error"
+                ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/**").permitAll()
                 .anyRequest().authenticated()
         );

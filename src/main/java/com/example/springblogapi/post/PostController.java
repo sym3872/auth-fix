@@ -2,6 +2,13 @@ package com.example.springblogapi.post;
 
 import com.example.springblogapi.auth.User;
 import com.example.springblogapi.post.Post.PostRepository;
+import com.example.springblogapi.config.SwaggerConfig;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -28,6 +35,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 // 이 클래스의 모든 API 주소 앞에는 /api/posts가 붙는다.
 @RequestMapping("/api/posts")
+// Swagger UI에서 게시글 관련 API를 Post 그룹으로 묶어 보여 준다.
+@Tag(name = "Post", description = "게시글 CRUD API")
 public class PostController {
 
     /** 게시글 데이터를 저장하고 찾는 역할을 Spring이 주입해 준다. */
@@ -48,6 +57,14 @@ public class PostController {
      */
     // POST /api/posts 요청을 이 메서드와 연결한다.
     @PostMapping
+    // Swagger UI에서 이 API가 JWT 인증을 요구한다는 점을 표시한다.
+    @Operation(summary = "게시글 작성", description = "로그인한 회원을 작성자로 하여 게시글을 생성합니다.")
+    @SecurityRequirement(name = SwaggerConfig.BEARER_AUTH)
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "게시글 작성 성공"),
+            @ApiResponse(responseCode = "400", description = "제목 또는 내용 입력값 오류"),
+            @ApiResponse(responseCode = "401", description = "JWT 인증 필요")
+    })
     public ResponseEntity<PostResponse> createPost(@Valid @RequestBody CreatePostRequest request) {
         // JWT 필터가 SecurityContext에 넣은 현재 로그인 회원을 가져온다.
         User currentUser = getCurrentLoginUser();
@@ -69,6 +86,9 @@ public class PostController {
      */
     // GET /api/posts 요청을 목록 조회 메서드와 연결한다.
     @GetMapping
+    // Swagger UI에서 목록 조회가 공개 API임을 문서화한다.
+    @Operation(summary = "게시글 목록 조회", description = "로그인 없이 모든 게시글을 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "게시글 목록 조회 성공")
     // readOnly는 이 메서드가 데이터를 수정하지 않는 조회 작업임을 표시한다.
     @Transactional(readOnly = true)
     public List<PostResponse> getPosts() {
@@ -86,6 +106,12 @@ public class PostController {
      */
     // {id} 부분에는 사용자가 요청한 게시글 번호가 들어간다.
     @GetMapping("/{id}")
+    // Swagger UI에서 상세 조회가 공개 API임을 문서화한다.
+    @Operation(summary = "게시글 상세 조회", description = "게시글 번호로 한 건의 내용을 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "게시글 상세 조회 성공"),
+            @ApiResponse(responseCode = "404", description = "게시글 없음")
+    })
     @Transactional(readOnly = true)
     public PostResponse getPost(@PathVariable Long id) {
         // @PathVariable이 URL의 글 번호를 Long id 매개변수에 넣어 준다.
@@ -102,6 +128,16 @@ public class PostController {
      */
     // PUT /api/posts/{id} 요청을 게시글 수정 메서드와 연결한다.
     @PutMapping("/{id}")
+    // Swagger UI에서 JWT 인증과 작성자 본인 검사가 모두 필요함을 표시한다.
+    @Operation(summary = "게시글 수정", description = "작성자 본인만 제목과 내용을 수정할 수 있습니다.")
+    @SecurityRequirement(name = SwaggerConfig.BEARER_AUTH)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "게시글 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "제목 또는 내용 입력값 오류"),
+            @ApiResponse(responseCode = "401", description = "JWT 인증 필요"),
+            @ApiResponse(responseCode = "403", description = "작성자 본인이 아님"),
+            @ApiResponse(responseCode = "404", description = "게시글 없음")
+    })
     // 조회, 권한 검사, 수정을 하나의 작업 단위로 묶는다.
     @Transactional
     public PostResponse updatePost(
@@ -134,6 +170,15 @@ public class PostController {
      */
     // DELETE /api/posts/{id} 요청을 삭제 메서드와 연결한다.
     @DeleteMapping("/{id}")
+    // Swagger UI에서 삭제 API의 JWT 인증과 작성자 본인 검사를 표시한다.
+    @Operation(summary = "게시글 삭제", description = "작성자 본인만 게시글을 삭제할 수 있습니다.")
+    @SecurityRequirement(name = SwaggerConfig.BEARER_AUTH)
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "게시글 삭제 성공"),
+            @ApiResponse(responseCode = "401", description = "JWT 인증 필요"),
+            @ApiResponse(responseCode = "403", description = "작성자 본인이 아님"),
+            @ApiResponse(responseCode = "404", description = "게시글 없음")
+    })
     @Transactional
     public ResponseEntity<Void> deletePost(@PathVariable Long id) {
         // 1단계: 현재 로그인 회원을 확인한다.
@@ -204,7 +249,9 @@ public class PostController {
      */
     public record CreatePostRequest(
             // 제목과 내용은 공백만 입력하는 것도 허용하지 않는다.
+            @Schema(description = "게시글 제목", example = "첫 번째 글")
             @NotBlank(message = "제목은 비어 있을 수 없습니다.") String title,
+            @Schema(description = "게시글 본문", example = "JWT로 작성한 첫 번째 게시글입니다.")
             @NotBlank(message = "내용은 비어 있을 수 없습니다.") String content
     ) {
     }
@@ -212,18 +259,20 @@ public class PostController {
     /** 게시글 수정 JSON의 새 제목과 본문을 받는 자료 상자다. */
     public record UpdatePostRequest(
             // 수정 요청도 제목과 내용이 모두 있어야 한다.
+            @Schema(description = "수정할 게시글 제목", example = "수정한 글")
             @NotBlank(message = "제목은 비어 있을 수 없습니다.") String title,
+            @Schema(description = "수정할 게시글 본문", example = "작성자 본인만 수정할 수 있습니다.")
             @NotBlank(message = "내용은 비어 있을 수 없습니다.") String content
     ) {
     }
 
     /** 게시글과 공개 가능한 작성자 정보만 JSON으로 반환하는 자료 상자다. */
     public record PostResponse(
-            Long id,
-            String title,
-            String content,
-            Long authorId,
-            String authorNickname
+            @Schema(description = "게시글 번호", example = "1") Long id,
+            @Schema(description = "게시글 제목", example = "첫 번째 글") String title,
+            @Schema(description = "게시글 본문", example = "JWT로 작성한 첫 번째 게시글입니다.") String content,
+            @Schema(description = "작성자 회원 번호", example = "1") Long authorId,
+            @Schema(description = "작성자 닉네임", example = "홍길동") String authorNickname
     ) {
         /** Post 엔티티에서 응답에 필요한 값만 골라 복사한다. */
         public static PostResponse from(Post post) {
