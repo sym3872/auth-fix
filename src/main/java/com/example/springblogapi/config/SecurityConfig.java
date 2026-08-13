@@ -10,9 +10,7 @@ import io.jsonwebtoken.security.Keys;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import io.swagger.v3.oas.models.servers.Server;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,23 +63,16 @@ public class SecurityConfig {
         return new JwtTokenProvider(base64Secret, expirationMilliseconds);
     }
 
-    /** Swagger UI의 제목, 서버 주소, JWT 입력 방식을 설정한다. */
+    /** Swagger UI의 제목과 JWT 입력 방식을 설정한다. */
     @Bean
     public OpenAPI openAPI() {
-        SecurityScheme bearer = new SecurityScheme()
-                .type(SecurityScheme.Type.HTTP)
-                .scheme("bearer")
-                .bearerFormat("JWT")
-                .description("로그인 응답의 token 값만 입력하면 Bearer 접두사는 자동으로 붙습니다.");
-
         return new OpenAPI()
                 .info(new Info()
                         .title("SecureBlog API")
                         .version("1.1.0")
-                        .description("JWT Access Token을 사용하는 학습용 블로그 API입니다.")
-                        .license(new License().name("학습용 프로젝트")))
-                .addServersItem(new Server().url("http://localhost:8080").description("로컬 개발 서버"))
-                .components(new Components().addSecuritySchemes(BEARER_AUTH, bearer));
+                        .description("JWT Access Token을 사용하는 학습용 블로그 API입니다."))
+                .components(new Components().addSecuritySchemes(BEARER_AUTH, new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
     }
 
     /**

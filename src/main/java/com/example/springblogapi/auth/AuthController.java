@@ -2,9 +2,6 @@ package com.example.springblogapi.auth;
 
 import com.example.springblogapi.config.SecurityConfig.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,12 +50,7 @@ public class AuthController {
 
     /** 이메일 중복을 확인하고 BCrypt로 암호화한 비밀번호를 저장한다. */
     @PostMapping("/signup")
-    @Operation(summary = "회원가입", description = "이메일, 비밀번호, 닉네임으로 새 회원을 등록합니다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "회원가입 성공"),
-            @ApiResponse(responseCode = "400", description = "입력값 검증 실패"),
-            @ApiResponse(responseCode = "409", description = "이미 사용 중인 이메일")
-    })
+    @Operation(summary = "회원가입")
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
@@ -70,19 +62,13 @@ public class AuthController {
                 request.nickname()
         ));
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                new SignupResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname())
-        );
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SignupResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname()));
     }
 
     /** 이메일과 BCrypt 비밀번호를 비교하고, 성공하면 Access Token을 발급한다. */
     @PostMapping("/login")
-    @Operation(summary = "로그인", description = "이메일과 비밀번호를 확인하고 JWT Access Token을 발급합니다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인 성공 및 Access Token 발급"),
-            @ApiResponse(responseCode = "400", description = "입력값 검증 실패"),
-            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치")
-    })
+    @Operation(summary = "로그인")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElseThrow(this::loginFailed);
 
@@ -104,40 +90,20 @@ public class AuthController {
     }
 
     /** 회원가입 요청 JSON이다. record는 생성자와 값을 읽는 메서드를 자동으로 만든다. */
-    public record SignupRequest(
-            @Schema(description = "로그인에 사용할 이메일", example = "user@example.com")
-            @NotBlank @Email String email,
-            @Schema(description = "4글자 이상 비밀번호", example = "password1234", accessMode = Schema.AccessMode.WRITE_ONLY)
-            @NotBlank @Size(min = 4) String password,
-            @Schema(description = "화면에 표시할 닉네임", example = "홍길동")
-            @NotBlank String nickname
-    ) {
+    public record SignupRequest(@NotBlank @Email String email, @NotBlank @Size(min = 4) String password,
+                                @NotBlank String nickname) {
     }
 
     /** 회원가입 뒤 비밀번호를 제외하고 반환하는 회원 정보다. */
-    public record SignupResponse(
-            @Schema(description = "생성된 회원 번호", example = "1") Long id,
-            @Schema(description = "가입한 이메일", example = "user@example.com") String email,
-            @Schema(description = "가입한 닉네임", example = "홍길동") String nickname
-    ) {
+    public record SignupResponse(Long id, String email, String nickname) {
     }
 
     /** 로그인 요청 JSON이다. */
-    public record LoginRequest(
-            @Schema(description = "가입한 이메일", example = "user@example.com")
-            @NotBlank @Email String email,
-            @Schema(description = "가입한 비밀번호", example = "password1234", accessMode = Schema.AccessMode.WRITE_ONLY)
-            @NotBlank String password
-    ) {
+    public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {
     }
 
     /** 로그인 성공 시 반환하는 회원 정보와 JWT Access Token이다. */
-    public record LoginResponse(
-            @Schema(description = "회원 번호", example = "1") Long id,
-            @Schema(description = "회원 이메일", example = "user@example.com") String email,
-            @Schema(description = "회원 닉네임", example = "홍길동") String nickname,
-            @Schema(description = "보호 API 호출에 사용할 JWT Access Token") String token
-    ) {
+    public record LoginResponse(Long id, String email, String nickname, String token) {
     }
 
     /**

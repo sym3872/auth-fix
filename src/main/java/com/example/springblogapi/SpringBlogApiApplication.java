@@ -14,12 +14,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring Boot 서버를 시작하는 클래스다.
- * 아래의 TerminalMenu는 REST API를 쉽게 연습하는 보조 메뉴라 같은 파일에 둔다.
+ * 아래 TerminalMenu는 REST API를 쉽게 연습하기 위한 보조 메뉴다.
  */
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 @EnableJpaRepositories(considerNestedRepositories = true)
@@ -38,7 +37,7 @@ public class SpringBlogApiApplication {
 
 /**
  * Postman 대신 API를 호출해 볼 수 있는 간단한 숫자 메뉴다.
- * 서버 API를 호출하므로 JWT 보안과 작성자 검사를 그대로 거친다.
+ * 메뉴도 실제 REST API를 호출하므로 JWT 보안과 작성자 검사를 그대로 거친다.
  */
 class TerminalMenu {
 
@@ -52,14 +51,15 @@ class TerminalMenu {
     /** 사용자가 0번을 선택할 때까지 메뉴를 반복한다. */
     void run() {
         System.out.println("\nSpring Boot 서버와 터미널 메뉴가 실행되었습니다.");
+
         while (true) {
             printMenu();
             try {
                 switch (input("메뉴 번호: ")) {
                     case "1" -> signup();
                     case "2" -> login();
-                    case "3" -> listPosts();
-                    case "4" -> detailPost();
+                    case "3" -> show("게시글 목록", request("GET", "/api/posts", null, false));
+                    case "4" -> show("게시글 상세", request("GET", "/api/posts/" + inputRequired("게시글 번호: "), null, false));
                     case "5" -> createPost();
                     case "6" -> updatePost();
                     case "7" -> deletePost();
@@ -80,90 +80,83 @@ class TerminalMenu {
         }
     }
 
+    /** 현재 로그인 상태와 가능한 기능을 출력한다. */
     private void printMenu() {
         String state = token == null ? "로그아웃" : loginEmail + " 로그인 중";
-        System.out.println("\n============================");
-        System.out.println(" SecureBlog 메뉴 (" + state + ")");
-        System.out.println("============================");
-        System.out.println("1. 회원가입");
-        System.out.println("2. 로그인");
-        System.out.println("3. 게시글 목록");
-        System.out.println("4. 게시글 상세");
-        System.out.println("5. 게시글 작성 (로그인 필요)");
-        System.out.println("6. 게시글 수정 (작성자만)");
-        System.out.println("7. 게시글 삭제 (작성자만)");
-        System.out.println("8. 로그아웃");
-        System.out.println("0. 종료");
+        System.out.printf("""
+
+                ============================
+                 SecureBlog 메뉴 (%s)
+                ============================
+                1. 회원가입
+                2. 로그인
+                3. 게시글 목록
+                4. 게시글 상세
+                5. 게시글 작성 (로그인 필요)
+                6. 게시글 수정 (작성자만)
+                7. 게시글 삭제 (작성자만)
+                8. 로그아웃
+                0. 종료
+                """, state);
     }
 
-    /** 회원가입 API를 호출한다. */
+    /** 회원가입 API를 호출한다. 입력 검증은 서버의 @Valid가 담당한다. */
     private void signup() throws IOException, InterruptedException {
         show("회원가입", request("POST", "/api/auth/signup", Map.of(
-                "email", inputEmail(),
-                "password", inputNewPassword(),
+                "email", inputRequired("이메일: "),
+                "password", inputRequired("비밀번호: "),
                 "nickname", inputRequired("닉네임: ")
         ), false));
     }
 
     /** 로그인 성공 시 응답의 Access Token을 저장한다. */
     private void login() throws IOException, InterruptedException {
-        String email = inputEmail();
+        String email = inputRequired("이메일: ");
         HttpResponse<String> response = request("POST", "/api/auth/login", Map.of(
                 "email", email,
                 "password", inputRequired("비밀번호: ")
         ), false);
         show("로그인", response);
+
         if (response.statusCode() == 200) {
             token = json.readTree(response.body()).path("token").asString();
             loginEmail = email;
-            System.out.println("로그인 상태가 안전하게 저장되었습니다.");
         }
-    }
-
-    private void listPosts() throws IOException, InterruptedException {
-        show("게시글 목록", request("GET", "/api/posts", null, false));
-    }
-
-    private void detailPost() throws IOException, InterruptedException {
-        show("게시글 상세", request("GET", "/api/posts/" + inputPostId(), null, false));
     }
 
     /** 저장한 JWT를 넣어 게시글을 작성한다. */
     private void createPost() throws IOException, InterruptedException {
-        if (!checkLogin()) {
-            return;
+        if (checkLogin()) {
+            show("게시글 작성", request("POST", "/api/posts", postBody("제목: ", "내용: "), true));
         }
-        show("게시글 작성", request("POST", "/api/posts", Map.of(
-                "title", inputRequired("제목: "),
-                "content", inputRequired("내용: ")
-        ), true));
     }
 
-    /** 저장한 JWT를 넣어 본인 게시글을 수정한다. */
+    /** 저장한 JWT를 넣어 작성자 본인의 게시글을 수정한다. */
     private void updatePost() throws IOException, InterruptedException {
-        if (!checkLogin()) {
-            return;
+        if (checkLogin()) {
+            String id = inputRequired("게시글 번호: ");
+            show("게시글 수정", request("PUT", "/api/posts/" + id, postBody("새 제목: ", "새 내용: "), true));
         }
-        String id = inputPostId();
-        show("게시글 수정", request("PUT", "/api/posts/" + id, Map.of(
-                "title", inputRequired("새 제목: "),
-                "content", inputRequired("새 내용: ")
-        ), true));
     }
 
-    /** 저장한 JWT를 넣어 본인 게시글을 삭제한다. */
+    /** 저장한 JWT를 넣어 작성자 본인의 게시글을 삭제한다. */
     private void deletePost() throws IOException, InterruptedException {
         if (!checkLogin()) {
             return;
         }
-        String id = inputPostId();
-        if (!input("정말 삭제할까요? (y/N): ").equalsIgnoreCase("y")) {
-            System.out.println("삭제를 취소했습니다.");
-            return;
+
+        String id = inputRequired("게시글 번호: ");
+        if (input("정말 삭제할까요? (y/N): ").equalsIgnoreCase("y")) {
+            show("게시글 삭제", request("DELETE", "/api/posts/" + id, null, true));
         }
-        show("게시글 삭제", request("DELETE", "/api/posts/" + id, null, true));
     }
 
+    /** 작성과 수정에서 공통으로 쓰는 title, content JSON을 만든다. */
+    private Map<String, String> postBody(String titleMessage, String contentMessage) {
+        return Map.of("title", inputRequired(titleMessage), "content", inputRequired(contentMessage));
+    }
+
+    /** 서버가 세션을 저장하지 않으므로 메뉴가 가진 토큰을 지우면 로그아웃이다. */
     private void logout() {
         token = null;
         loginEmail = null;
@@ -186,89 +179,28 @@ class TerminalMenu {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(SERVER_URL + path))
                 .header("Accept", "application/json");
+
+        if (body != null) {
+            builder.header("Content-Type", "application/json");
+        }
         if (useToken) {
             builder.header("Authorization", "Bearer " + token);
         }
 
-        HttpRequest.BodyPublisher publisher = HttpRequest.BodyPublishers.noBody();
-        if (body != null) {
-            builder.header("Content-Type", "application/json");
-            publisher = HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body));
-        }
+        HttpRequest.BodyPublisher publisher = body == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body));
+
         return http.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    /** 서버 응답을 JSON 원문 대신 간단한 한글 결과로 출력한다. */
+    /** 상태 코드와 서버 JSON을 그대로 출력해 API 응답을 쉽게 확인한다. */
     private void show(String name, HttpResponse<String> response) {
-        if (response.statusCode() >= 400) {
-            System.out.println("\n" + name + " 실패: " + errorMessage(response.statusCode()));
-            return;
-        }
-        if (response.body().isBlank()) {
-            System.out.println("\n게시글이 정상적으로 삭제되었습니다.");
-            return;
-        }
-        try {
-            JsonNode result = json.readTree(response.body());
-            switch (name) {
-                case "회원가입" -> printMember("회원가입 완료", result);
-                case "로그인" -> printMember("로그인 성공", result);
-                case "게시글 목록" -> printPostList(result);
-                default -> printPost(name + " 완료", result);
-            }
-        } catch (Exception exception) {
-            System.out.println("\n결과를 표시하지 못했습니다. 메뉴를 다시 실행해 주세요.");
-        }
+        String body = response.body().isBlank() ? "완료" : response.body();
+        System.out.printf("\n[%s] HTTP %d%n%s%n", name, response.statusCode(), body);
     }
 
-    private String errorMessage(int status) {
-        return switch (status) {
-            case 400 -> "입력 형식이 올바르지 않습니다.";
-            case 401 -> "이메일·비밀번호가 틀렸거나 로그인이 필요합니다.";
-            case 403 -> "작성자 본인만 수정하거나 삭제할 수 있습니다.";
-            case 404 -> "해당 번호의 게시글을 찾을 수 없습니다.";
-            case 409 -> "이미 가입된 이메일입니다.";
-            default -> "요청을 처리하지 못했습니다.";
-        };
-    }
-
-    private void printMember(String title, JsonNode member) {
-        System.out.println("\n============================");
-        System.out.println(" " + title);
-        System.out.println("============================");
-        System.out.println("회원 번호 : " + member.path("id").asString());
-        System.out.println("이메일    : " + member.path("email").asString());
-        System.out.println("닉네임    : " + member.path("nickname").asString());
-    }
-
-    private void printPost(String title, JsonNode post) {
-        System.out.println("\n============================");
-        System.out.println(" " + title);
-        System.out.println("============================");
-        System.out.println("글 번호 : " + post.path("id").asString());
-        System.out.println("제목    : " + post.path("title").asString());
-        System.out.println("내용    : " + post.path("content").asString());
-        System.out.println("작성자  : " + post.path("authorNickname").asString());
-    }
-
-    private void printPostList(JsonNode posts) {
-        System.out.println("\n============================");
-        System.out.println(" 게시글 목록");
-        System.out.println("============================");
-        if (posts.isEmpty()) {
-            System.out.println("아직 작성된 게시글이 없습니다.");
-            return;
-        }
-        for (JsonNode post : posts) {
-            System.out.println("[" + post.path("id").asString() + "번 글]");
-            System.out.println("제목   : " + post.path("title").asString());
-            System.out.println("내용   : " + post.path("content").asString());
-            System.out.println("작성자 : " + post.path("authorNickname").asString());
-            System.out.println("----------------------------");
-        }
-    }
-
-    /** 메뉴 입력을 받되, 빈 값·이메일·비밀번호·글 번호는 먼저 간단히 검사한다. */
+    /** 한 줄 입력을 받고, 빈 값은 다시 입력하게 한다. */
     private String input(String message) {
         System.out.print(message);
         if (!scanner.hasNextLine()) {
@@ -284,36 +216,6 @@ class TerminalMenu {
                 return value;
             }
             System.out.println("값을 비워 둘 수 없습니다.");
-        }
-    }
-
-    private String inputEmail() {
-        while (true) {
-            String email = inputRequired("이메일: ");
-            if (email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
-                return email;
-            }
-            System.out.println("이메일 형식이 아닙니다. 예: test@example.com");
-        }
-    }
-
-    private String inputNewPassword() {
-        while (true) {
-            String password = inputRequired("비밀번호(4글자 이상): ");
-            if (password.length() >= 4) {
-                return password;
-            }
-            System.out.println("비밀번호는 4글자 이상 입력해 주세요.");
-        }
-    }
-
-    private String inputPostId() {
-        while (true) {
-            String id = inputRequired("게시글 번호: ");
-            if (id.matches("[1-9][0-9]*")) {
-                return id;
-            }
-            System.out.println("게시글 번호는 1 이상의 숫자로 입력해 주세요.");
         }
     }
 }
