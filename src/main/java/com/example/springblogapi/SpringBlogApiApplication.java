@@ -51,6 +51,7 @@ class TerminalMenu {
     /** 사용자가 0번을 선택할 때까지 메뉴를 반복한다. */
     void run() {
         System.out.println("\nSpring Boot 서버와 터미널 메뉴가 실행되었습니다.");
+        System.out.println("Swagger 문서 주소: " + SERVER_URL + "/swagger-ui.html");
 
         while (true) {
             printMenu();
