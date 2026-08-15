@@ -1,6 +1,10 @@
 package com.example.springblogapi.auth;
 
 import com.example.springblogapi.config.SecurityConfig.JwtTokenProvider;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.Column;
@@ -16,6 +20,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,6 +56,11 @@ public class AuthController {
     /** 이메일 중복을 확인하고 BCrypt로 암호화한 비밀번호를 저장한다. */
     @PostMapping("/signup")
     @Operation(summary = "회원가입")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "회원가입 성공"),
+            @ApiResponse(responseCode = "400", description = "입력값이 올바르지 않음"),
+            @ApiResponse(responseCode = "409", description = "이미 사용 중인 이메일")
+    })
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
@@ -66,22 +76,31 @@ public class AuthController {
                 .body(new SignupResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname()));
     }
 
-    /** 이메일과 BCrypt 비밀번호를 비교하고, 성공하면 Access Token을 발급한다. */
-    @PostMapping("/login")
-    @Operation(summary = "로그인")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+    /** 이메일과 BCrypt 비밀번호를 비교하고, 성공하면 복사하기 쉬운 JWT 문자열만 반환한다. */
+    @PostMapping(value = "/login", produces = MediaType.TEXT_PLAIN_VALUE)
+    @Operation(
+            summary = "로그인",
+            description = "성공 응답에 표시되는 JWT 한 줄 전체만 복사하세요. 오른쪽 위 토큰 입력 버튼에는 "
+                    + "토큰만 붙여넣으면 Bearer는 Swagger가 자동으로 붙입니다."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "로그인 성공 - 본문 전체가 JWT Access Token입니다.",
+                    content = @Content(mediaType = MediaType.TEXT_PLAIN_VALUE,
+                            schema = @Schema(description = "JWT Access Token", example = "eyJhbGciOiJIUzI1NiJ9..."))
+            ),
+            @ApiResponse(responseCode = "400", description = "입력값이 올바르지 않음"),
+            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호가 올바르지 않음")
+    })
+    public String login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElseThrow(this::loginFailed);
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw loginFailed();
         }
 
-        return new LoginResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getNickname(),
-                jwtTokenProvider.createToken(user.getEmail())
-        );
+        return jwtTokenProvider.createToken(user.getEmail());
     }
 
     /** 이메일과 비밀번호 중 무엇이 틀렸는지 노출하지 않는 로그인 실패 응답이다. */
@@ -90,8 +109,14 @@ public class AuthController {
     }
 
     /** 회원가입 요청 JSON이다. record는 생성자와 값을 읽는 메서드를 자동으로 만든다. */
-    public record SignupRequest(@NotBlank @Email String email, @NotBlank @Size(min = 4) String password,
-                                @NotBlank String nickname) {
+    public record SignupRequest(
+            @Schema(description = "로그인에 사용할 이메일", example = "tester@example.com")
+            @NotBlank @Email String email,
+            @Schema(description = "4글자 이상 비밀번호", example = "pass1234")
+            @NotBlank @Size(min = 4) String password,
+            @Schema(description = "화면에 표시할 닉네임", example = "테스터")
+            @NotBlank String nickname
+    ) {
     }
 
     /** 회원가입 뒤 비밀번호를 제외하고 반환하는 회원 정보다. */
@@ -99,11 +124,12 @@ public class AuthController {
     }
 
     /** 로그인 요청 JSON이다. */
-    public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {
-    }
-
-    /** 로그인 성공 시 반환하는 회원 정보와 JWT Access Token이다. */
-    public record LoginResponse(Long id, String email, String nickname, String token) {
+    public record LoginRequest(
+            @Schema(description = "회원가입한 이메일", example = "tester@example.com")
+            @NotBlank @Email String email,
+            @Schema(description = "회원가입 때 입력한 비밀번호", example = "pass1234")
+            @NotBlank String password
+    ) {
     }
 
     /**

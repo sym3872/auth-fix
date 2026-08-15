@@ -85,9 +85,10 @@ class TerminalMenu {
         String state = token == null ? "로그아웃" : loginEmail + " 로그인 중";
         System.out.printf("""
 
-                ============================
-                 SecureBlog 메뉴 (%s)
-                ============================
+          ============================
+           SecureBlog 메뉴 (%s)
+           Swagger 문서: %s/swagger-ui.html
+          ============================
                 1. 회원가입
                 2. 로그인
                 3. 게시글 목록
@@ -97,8 +98,8 @@ class TerminalMenu {
                 7. 게시글 삭제 (작성자만)
                 8. 로그아웃
                 0. 종료
-                """, state);
-    }
+          """, state, SERVER_URL);
+}
 
     /** 회원가입 API를 호출한다. 입력 검증은 서버의 @Valid가 담당한다. */
     private void signup() throws IOException, InterruptedException {
@@ -119,7 +120,8 @@ class TerminalMenu {
         show("로그인", response);
 
         if (response.statusCode() == 200) {
-            token = json.readTree(response.body()).path("token").asString();
+            // 로그인 응답 본문은 JWT 한 줄뿐이므로 그대로 저장하면 된다.
+            token = response.body().trim();
             loginEmail = email;
         }
     }
@@ -178,7 +180,8 @@ class TerminalMenu {
     ) throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(SERVER_URL + path))
-                .header("Accept", "application/json");
+                // 로그인은 JWT 문자열(text/plain)을, 나머지 API는 JSON을 반환할 수 있다.
+                .header("Accept", "application/json, text/plain");
 
         if (body != null) {
             builder.header("Content-Type", "application/json");

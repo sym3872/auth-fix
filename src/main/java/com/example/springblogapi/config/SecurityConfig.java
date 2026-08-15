@@ -16,12 +16,20 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import javax.crypto.SecretKey;
+import org.springdoc.core.properties.SwaggerUiConfigProperties;
+import org.springdoc.core.properties.SwaggerUiOAuthProperties;
+import org.springdoc.core.providers.ObjectMapperProvider;
+import org.springdoc.webmvc.ui.SwaggerIndexPageTransformer;
+import org.springdoc.webmvc.ui.SwaggerIndexTransformer;
+import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -36,6 +44,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.resource.TransformedResource;
 
 /**
  * Spring Security, JWT, Swagger 설정을 한 파일에 모은다.
@@ -76,6 +85,43 @@ public class SecurityConfig {
     }
 
     /**
+     * Swagger 화면의 HTML에 초보자용 화면 도우미 파일을 연결한다.
+     * 자동 번역이 POST·GET을 엉뚱하게 바꾸지 못하게 하고, 한글/English 버튼도 붙인다.
+     */
+    @Bean
+    public SwaggerIndexTransformer swaggerIndexTransformer(
+            SwaggerUiConfigProperties swaggerUiConfig,
+            SwaggerUiOAuthProperties swaggerUiOAuthProperties,
+            SwaggerWelcomeCommon swaggerWelcomeCommon,
+            ObjectMapperProvider objectMapperProvider
+    ) {
+        SwaggerIndexPageTransformer defaultTransformer = new SwaggerIndexPageTransformer(
+                swaggerUiConfig, swaggerUiOAuthProperties, swaggerWelcomeCommon, objectMapperProvider
+        );
+
+        return (request, resource, transformerChain) -> {
+            Resource transformed = defaultTransformer.transform(request, resource, transformerChain);
+            String filename = transformed.getFilename();
+
+            if ("index.html".equals(filename)) {
+                String html = readResource(transformed)
+                        .replace("<html lang=\"en\">", "<html lang=\"ko\" translate=\"no\">")
+                        .replace("</head>", "<meta name=\"google\" content=\"notranslate\"></head>")
+                        .replace("</body>", "<script src=\"/swagger-helper.js\"></script></body>");
+                return new TransformedResource(transformed, html.getBytes(StandardCharsets.UTF_8));
+            }
+            return transformed;
+        };
+    }
+
+    /** Swagger 라이브러리 안의 텍스트 파일을 UTF-8 문자열로 읽는다. */
+    private static String readResource(Resource resource) throws IOException {
+        try (var inputStream = resource.getInputStream()) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
      * 공개 주소, 로그인 필수 주소, 세션 정책, JWT 필터 순서를 설정한다.
      * POST·PUT·DELETE 게시글 API는 anyRequest에 남겨 반드시 인증을 거치게 한다.
      */
@@ -100,6 +146,7 @@ public class SecurityConfig {
                         "/h2-console/**",
                         "/swagger-ui.html",
                         "/swagger-ui/**",
+                        "/swagger-helper.js",
                         "/v3/api-docs/**",
                         "/error"
                 ).permitAll()

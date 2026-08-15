@@ -54,6 +54,8 @@ springdoc:
     # API와 태그를 이름순으로 정렬해 초보자도 찾기 쉽게 한다.
     operations-sorter: alpha
     tags-sorter: alpha
+    # 아래쪽의 복잡한 모델 목록은 숨기고, 각 API의 요청·응답에 집중하게 한다.
+    default-models-expand-depth: -1
 
 # 실행 화면에서는 메뉴에 집중할 수 있도록 일반 정보 로그를 숨긴다. 오류 로그는 계속 표시된다.
 logging:
