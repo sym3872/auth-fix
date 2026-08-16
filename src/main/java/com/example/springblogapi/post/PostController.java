@@ -20,6 +20,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
@@ -80,6 +81,9 @@ public class PostController {
     /** 누구나 게시글 목록을 볼 수 있다. LAZY 작성자 정보를 읽기 위해 트랜잭션을 연다. */
     @GetMapping
     @Operation(summary = "게시글 목록 조회")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "게시글 목록 조회 성공")
+    })
     @Transactional(readOnly = true)
     public List<PostResponse> getPosts() {
         return postRepository.findAll().stream().map(PostResponse::from).toList();
@@ -174,7 +178,7 @@ public class PostController {
     /** 작성과 수정에서 같은 title, content JSON을 사용한다. */
     public record PostRequest(
             @Schema(description = "게시글 제목", example = "Swagger로 작성한 첫 게시글")
-            @NotBlank String title,
+            @NotBlank @Size(max = 100) String title,
             @Schema(description = "게시글 본문", example = "로그인 후 JWT 토큰을 등록하고 게시글을 작성했습니다.")
             @NotBlank String content
     ) {

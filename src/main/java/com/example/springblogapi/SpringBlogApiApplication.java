@@ -27,11 +27,9 @@ public class SpringBlogApiApplication {
     /** 서버를 시작하고 같은 터미널에서 숫자 메뉴를 실행한다. */
     public static void main(String[] args) {
         ConfigurableApplicationContext context = SpringApplication.run(SpringBlogApiApplication.class, args);
-        try {
-            new TerminalMenu().run();
-        } finally {
-            SpringApplication.exit(context);
-        }
+        // application.yml 또는 실행 옵션의 포트를 읽어 실제 서버와 메뉴 주소를 맞춘다.
+        String port = context.getEnvironment().getProperty("server.port", "8080");
+        new TerminalMenu("http://localhost:" + port).run();
     }
 }
 
@@ -41,17 +39,22 @@ public class SpringBlogApiApplication {
  */
 class TerminalMenu {
 
-    private static final String SERVER_URL = "http://localhost:8080";
+    private final String serverUrl;
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
     private final Scanner scanner = new Scanner(System.in);
     private String token;
     private String loginEmail;
 
+    /** 실제 서버 주소를 받아 메뉴의 API 요청과 Swagger 주소가 항상 같게 만든다. */
+    TerminalMenu(String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+
     /** 사용자가 0번을 선택할 때까지 메뉴를 반복한다. */
     void run() {
         System.out.println("\nSpring Boot 서버와 터미널 메뉴가 실행되었습니다.");
-        System.out.println("Swagger 문서 주소: " + SERVER_URL + "/swagger-ui.html");
+        System.out.println("Swagger 문서 주소: " + serverUrl + "/swagger-ui.html");
 
         while (true) {
             printMenu();
@@ -60,13 +63,13 @@ class TerminalMenu {
                     case "1" -> signup();
                     case "2" -> login();
                     case "3" -> show("게시글 목록", request("GET", "/api/posts", null, false));
-                    case "4" -> show("게시글 상세", request("GET", "/api/posts/" + inputRequired("게시글 번호: "), null, false));
+                    case "4" -> show("게시글 상세", request("GET", "/api/posts/" + postId(), null, false));
                     case "5" -> createPost();
                     case "6" -> updatePost();
                     case "7" -> deletePost();
                     case "8" -> logout();
                     case "0" -> {
-                        System.out.println("프로그램을 종료합니다.");
+                        System.out.println("터미널 메뉴를 닫습니다. 서버를 종료하려면 Ctrl+C를 누르세요.");
                         return;
                     }
                     default -> System.out.println("0~8 사이의 번호를 입력해 주세요.");
@@ -99,8 +102,8 @@ class TerminalMenu {
                 7. 게시글 삭제 (작성자만)
                 8. 로그아웃
                 0. 종료
-          """, state, SERVER_URL);
-}
+          """, state, serverUrl);
+    }
 
     /** 회원가입 API를 호출한다. 입력 검증은 서버의 @Valid가 담당한다. */
     private void signup() throws IOException, InterruptedException {
@@ -137,7 +140,7 @@ class TerminalMenu {
     /** 저장한 JWT를 넣어 작성자 본인의 게시글을 수정한다. */
     private void updatePost() throws IOException, InterruptedException {
         if (checkLogin()) {
-            String id = inputRequired("게시글 번호: ");
+            String id = postId();
             show("게시글 수정", request("PUT", "/api/posts/" + id, postBody("새 제목: ", "새 내용: "), true));
         }
     }
@@ -148,7 +151,7 @@ class TerminalMenu {
             return;
         }
 
-        String id = inputRequired("게시글 번호: ");
+        String id = postId();
         if (input("정말 삭제할까요? (y/N): ").equalsIgnoreCase("y")) {
             show("게시글 삭제", request("DELETE", "/api/posts/" + id, null, true));
         }
@@ -157,6 +160,17 @@ class TerminalMenu {
     /** 작성과 수정에서 공통으로 쓰는 title, content JSON을 만든다. */
     private Map<String, String> postBody(String titleMessage, String contentMessage) {
         return Map.of("title", inputRequired(titleMessage), "content", inputRequired(contentMessage));
+    }
+
+    /** 게시글 번호는 1 이상의 숫자만 받아 서버 오류 대신 바로 입력 안내를 보여 준다. */
+    private String postId() {
+        while (true) {
+            String id = inputRequired("게시글 번호: ");
+            if (id.matches("[1-9]\\d*")) {
+                return id;
+            }
+            System.out.println("게시글 번호는 1 이상의 숫자로 입력해 주세요.");
+        }
     }
 
     /** 서버가 세션을 저장하지 않으므로 메뉴가 가진 토큰을 지우면 로그아웃이다. */
@@ -180,7 +194,7 @@ class TerminalMenu {
             String method, String path, Map<String, String> body, boolean useToken
     ) throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(SERVER_URL + path))
+                .uri(URI.create(serverUrl + path))
                 // 로그인은 JWT 문자열(text/plain)을, 나머지 API는 JSON을 반환할 수 있다.
                 .header("Accept", "application/json, text/plain");
 

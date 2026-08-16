@@ -7,6 +7,12 @@ spring:
   application:
     name: secure-blog-api
 
+  web:
+    error:
+      # 학습 중에는 400·401·403·404 오류 이유를 Swagger와 터미널에서 바로 확인한다.
+      # 실제 서비스에서는 필요한 오류 메시지만 별도로 반환하는 편이 안전하다.
+      include-message: always
+
   # 설치 없이 실행되는 H2 in-memory 데이터베이스 연결 정보다.
   datasource:
     url: jdbc:h2:mem:blogdb
@@ -36,8 +42,8 @@ server:
 
 # JWT를 만들 때 사용하는 학습용 비밀키와 토큰 유효 시간이다.
 jwt:
-  # Base64로 표현한 32바이트 키다. 실제 서비스에서는 이 값을 소스 코드에 두지 말고 환경 변수로 관리해야 한다.
-  secret: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+  # 기본값은 로컬 학습용 키다. 배포할 때는 JWT_SECRET 환경 변수로 반드시 교체한다.
+  secret: ${JWT_SECRET:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
   # 60분 동안만 사용할 수 있는 Access Token이다. Refresh Token은 이 학습 프로젝트에서 사용하지 않는다.
   expiration-ms: 3600000
 

@@ -86,7 +86,7 @@ public class SecurityConfig {
 
     /**
      * Swagger 화면의 HTML에 초보자용 화면 도우미 파일을 연결한다.
-     * 자동 번역이 POST·GET을 엉뚱하게 바꾸지 못하게 하고, 한글/English 버튼도 붙인다.
+     * 브라우저 자동 번역이 POST·GET을 엉뚱하게 바꾸지 못하게 하고, 한국어 화면 도우미를 붙인다.
      */
     @Bean
     public SwaggerIndexTransformer swaggerIndexTransformer(
