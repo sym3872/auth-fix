@@ -1,24 +1,13 @@
 package com.example.springblogapi.auth;
 
-import com.example.springblogapi.config.SecurityConfig.JwtTokenProvider;
+import com.example.springblogapi.config.JwtTokenProvider;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,10 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * 회원가입과 로그인 API, 회원 데이터 구조를 한 파일에 모은다.
- * 기능이 작으므로 별도의 Service나 DTO 파일은 만들지 않고 record를 사용한다.
- */
+/** 회원가입과 로그인 API의 요청 흐름을 담당하는 컨트롤러다. */
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Auth", description = "회원가입과 로그인 API")
@@ -42,7 +28,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
-    /** Spring이 저장소, BCrypt 암호화기, JWT 도구를 생성자로 넣어 준다. */
+    /** Spring이 회원 저장소, BCrypt 암호화기, JWT 도구를 생성자로 넣어 준다. */
     public AuthController(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
@@ -76,7 +62,7 @@ public class AuthController {
                 .body(new SignupResponse(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname()));
     }
 
-    /** 이메일과 BCrypt 비밀번호를 비교하고, 성공하면 복사하기 쉬운 JWT 문자열만 반환한다. */
+    /** 이메일과 BCrypt 비밀번호를 비교하고, 성공하면 JWT 문자열만 반환한다. */
     @PostMapping(value = "/login", produces = MediaType.TEXT_PLAIN_VALUE)
     @Operation(
             summary = "로그인",
@@ -106,88 +92,5 @@ public class AuthController {
     /** 이메일과 비밀번호 중 무엇이 틀렸는지 노출하지 않는 로그인 실패 응답이다. */
     private ResponseStatusException loginFailed() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
-    }
-
-    /** 회원가입 요청 JSON이다. record는 생성자와 값을 읽는 메서드를 자동으로 만든다. */
-    public record SignupRequest(
-            @Schema(description = "로그인에 사용할 이메일", example = "tester@example.com")
-            @NotBlank @Email String email,
-            @Schema(description = "4글자 이상 비밀번호", example = "pass1234")
-            @NotBlank @Size(min = 4) String password,
-            @Schema(description = "화면에 표시할 닉네임", example = "테스터")
-            @NotBlank String nickname
-    ) {
-    }
-
-    /** 회원가입 뒤 비밀번호를 제외하고 반환하는 회원 정보다. */
-    public record SignupResponse(Long id, String email, String nickname) {
-    }
-
-    /** 로그인 요청 JSON이다. */
-    public record LoginRequest(
-            @Schema(description = "회원가입한 이메일", example = "tester@example.com")
-            @NotBlank @Email String email,
-            @Schema(description = "회원가입 때 입력한 비밀번호", example = "pass1234")
-            @NotBlank String password
-    ) {
-    }
-
-    /**
-     * H2의 users 테이블 한 행을 표현하는 회원 엔티티다.
-     * 이 파일에서만 사용하는 단순한 회원 기능이라 컨트롤러와 함께 둔다.
-     */
-    @Entity
-    @Table(name = "users")
-    public static class User {
-
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private Long id;
-
-        @Column(nullable = false, unique = true)
-        private String email;
-
-        // 평문이 아니라 BCrypt로 암호화된 문자열만 저장한다.
-        @Column(nullable = false)
-        private String password;
-
-        @Column(nullable = false)
-        private String nickname;
-
-        /** JPA가 데이터베이스 값으로 객체를 만들 때 필요한 기본 생성자다. */
-        protected User() {
-        }
-
-        public User(String email, String password, String nickname) {
-            this.email = email;
-            this.password = password;
-            this.nickname = nickname;
-        }
-
-        public Long getId() {
-            return id;
-        }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public String getNickname() {
-            return nickname;
-        }
-    }
-
-    /**
-     * JpaRepository가 save, findById, delete 같은 기본 DB 작업을 자동으로 제공한다.
-     * 중첩 인터페이스이므로 Application의 considerNestedRepositories 설정이 필요하다.
-     */
-    public interface UserRepository extends JpaRepository<User, Long> {
-        Optional<User> findByEmail(String email);
-
-        boolean existsByEmail(String email);
     }
 }
